@@ -34,10 +34,14 @@ const char* firebase_ca =     "-----BEGIN CERTIFICATE-----\n" \
 RTC_DATA_ATTR int bootCount = 1;
 RTC_DATA_ATTR int last_reading = 0;
 const int a_in_pin = 34;
+const int led_pin = 5;
 HTTPClient http;
+
 
 void setup(){
   Serial.begin(115200);
+  pinMode(led_pin, OUTPUT);
+  digitalWrite(led_pin, HIGH);
   delay(5000);
   bootCount++;
   Serial.println("Boot number: " + String(bootCount));
@@ -66,7 +70,8 @@ void setup(){
   }
 
   // sleep
-  esp_deep_sleep_enable_timer_wakeup(10 * 1000000);
+  digitalWrite(led_pin, LOW);
+  esp_deep_sleep_enable_timer_wakeup(60 * 1000000);
   esp_deep_sleep_pd_config(ESP_PD_DOMAIN_RTC_PERIPH, ESP_PD_OPTION_OFF);
   esp_deep_sleep_start();
 }

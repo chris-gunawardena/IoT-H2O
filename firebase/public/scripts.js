@@ -1,7 +1,7 @@
 var charts_loaded = false;
 var data_loaded = false;
 var chart_data = null;
-var days = -8;
+var days = 0;
 var readings_date = new Date();
 
 var draw_chart = () => {
@@ -38,7 +38,7 @@ var  load_data = () => {
         let value = reading.val();
         let date = new Date(value.timestamp);
         chart_data.push([
-          [date.getHours(), date.getMinutes(), date.getSeconds()],
+          [date.getHours()-1, date.getMinutes(), date.getSeconds()],
           value.level
         ]);
       });
