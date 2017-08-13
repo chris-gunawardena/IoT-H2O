@@ -1,0 +1,13 @@
+{
+  "rules": {
+    ".read": true,
+    ".write": true,
+    "users": {
+      "chris": {
+        "readings": {
+          ".indexOn": "timestamp"
+        }
+      }
+    }
+  }
+}
