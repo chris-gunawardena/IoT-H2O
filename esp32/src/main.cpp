@@ -2,7 +2,8 @@
 #include <WiFi.h>
 #include <WiFiClientSecure.h>
 #include <HTTPClient.h>
- 
+#include <esp_log.h>
+
 const char* firebase_ca =     "-----BEGIN CERTIFICATE-----\n" \
     "MIIEKDCCAxCgAwIBAgIQAQAhJYiw+lmnd+8Fe2Yn3zANBgkqhkiG9w0BAQsFADBC\n" \
     "MQswCQYDVQQGEwJVUzEWMBQGA1UEChMNR2VvVHJ1c3QgSW5jLjEbMBkGA1UEAxMS\n" \
@@ -38,40 +39,60 @@ const int a_in_pin = 34;
 const int led_pin = 5;
 
 void setup(){
+  esp_log_level_set("*", ESP_LOG_VERBOSE);
+
   Serial.begin(115200);
   pinMode(led_pin, OUTPUT);
   digitalWrite(led_pin, HIGH);
   delay(5000);
+
   bootCount++;
   Serial.println("Boot number: " + String(bootCount));
+
+  UBaseType_t uxHighWaterMark = uxTaskGetStackHighWaterMark( NULL );
+  Serial.print( "Memory: " );
+  Serial.print(uxHighWaterMark );
+  Serial.print( " ");
+  Serial.println( esp_get_free_heap_size() );
 
   // measure 
   int reading = analogRead(a_in_pin);
   Serial.println("Reading: " + String(reading));
   if (reading != last_reading && reading != 0) {
-    last_reading = reading;
 
     // WiFi
     WiFi.begin(ssid, password); 
     while (WiFi.status() != WL_CONNECTED) {
-      delay(1000);
+      delay(3000);
       Serial.println("Connecting to WiFi..");
     }
     Serial.println("Connected to the WiFi network");
 
     // POST  
     HTTPClient http;
+    http.setReuse(true);
     http.begin("https://water-9dbfa.firebaseio.com/users/chris/readings.json", firebase_ca);  //Specify destination for HTTP request
     Serial.println("http begun");
     http.addHeader("Content-Type", "application/json");             //Specify content-type header
     int httpResponseCode = http.POST("{ \"level\": " + String(reading) + ", \"timestamp\": {\".sv\": \"timestamp\"} }");   
-    Serial.println("httpResponseCode: " + http.errorToString(httpResponseCode));
+    if(httpResponseCode > 0) {
+      last_reading = reading;
+      Serial.println(http.getString());
+    } else {
+      Serial.println("httpResponseCode: " + http.errorToString(httpResponseCode));
+    }
     http.end();
   }
 
+  UBaseType_t uxHighWaterMark2 = uxTaskGetStackHighWaterMark( NULL );
+  Serial.print( "Memory: " );
+  Serial.print(uxHighWaterMark2 );
+  Serial.print( " ");
+  Serial.println( esp_get_free_heap_size() );
+
   // sleep
   digitalWrite(led_pin, LOW);
-  esp_deep_sleep_enable_timer_wakeup(60 * 1000000);
+  esp_deep_sleep_enable_timer_wakeup(10 * 1000000);
   esp_deep_sleep_pd_config(ESP_PD_DOMAIN_RTC_PERIPH, ESP_PD_OPTION_OFF);
   esp_deep_sleep_start();
 }
