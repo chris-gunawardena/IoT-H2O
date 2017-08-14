@@ -3,8 +3,6 @@
 #include <WiFiClientSecure.h>
 #include <HTTPClient.h>
  
-const char* ssid = "FASTWEB-1-D2700B";
-const char* password = "978C3B413C";
 const char* firebase_ca =     "-----BEGIN CERTIFICATE-----\n" \
     "MIIEKDCCAxCgAwIBAgIQAQAhJYiw+lmnd+8Fe2Yn3zANBgkqhkiG9w0BAQsFADBC\n" \
     "MQswCQYDVQQGEwJVUzEWMBQGA1UEChMNR2VvVHJ1c3QgSW5jLjEbMBkGA1UEAxMS\n" \
@@ -31,12 +29,13 @@ const char* firebase_ca =     "-----BEGIN CERTIFICATE-----\n" \
     "MqO5tzHpCvX2HzLc\n" \
     "-----END CERTIFICATE-----\n";;
 
+
+const char* ssid = "FASTWEB-1-D2700B";
+const char* password = "978C3B413C";
 RTC_DATA_ATTR int bootCount = 1;
 RTC_DATA_ATTR int last_reading = 0;
 const int a_in_pin = 34;
 const int led_pin = 5;
-HTTPClient http;
-
 
 void setup(){
   Serial.begin(115200);
@@ -61,8 +60,9 @@ void setup(){
     Serial.println("Connected to the WiFi network");
 
     // POST  
-    http.setReuse(true);
+    HTTPClient http;
     http.begin("https://water-9dbfa.firebaseio.com/users/chris/readings.json", firebase_ca);  //Specify destination for HTTP request
+    Serial.println("http begun");
     http.addHeader("Content-Type", "application/json");             //Specify content-type header
     int httpResponseCode = http.POST("{ \"level\": " + String(reading) + ", \"timestamp\": {\".sv\": \"timestamp\"} }");   
     Serial.println("httpResponseCode: " + http.errorToString(httpResponseCode));
