@@ -37,33 +37,27 @@ RTC_DATA_ATTR int bootCount = 1;
 RTC_DATA_ATTR int last_reading = 0;
 const int a_in_pin = 34;
 const int led_pin = 5;
+int sleep_time_seconds = 1 * 60;
 
 void setup(){
-  esp_log_level_set("*", ESP_LOG_VERBOSE);
+  //esp_log_level_set("*", ESP_LOG_VERBOSE);
 
   Serial.begin(115200);
   pinMode(led_pin, OUTPUT);
   digitalWrite(led_pin, HIGH);
   delay(5000);
 
-  bootCount++;
-  Serial.println("Boot number: " + String(bootCount));
-
-  UBaseType_t uxHighWaterMark = uxTaskGetStackHighWaterMark( NULL );
-  Serial.print( "Memory: " );
-  Serial.print(uxHighWaterMark );
-  Serial.print( " ");
-  Serial.println( esp_get_free_heap_size() );
+  Serial.println("Boot number: " + String(bootCount++));
 
   // measure 
   int reading = analogRead(a_in_pin);
   Serial.println("Reading: " + String(reading));
-  if (reading != last_reading && reading != 0) {
 
+  if (reading != last_reading && reading != 0) {
     // WiFi
     WiFi.begin(ssid, password); 
     while (WiFi.status() != WL_CONNECTED) {
-      delay(3000);
+      delay(5000);
       Serial.println("Connecting to WiFi..");
     }
     Serial.println("Connected to the WiFi network");
@@ -71,6 +65,7 @@ void setup(){
     // POST  
     HTTPClient http;
     http.setReuse(true);
+    // ESP.getEfuseMac()
     http.begin("https://water-9dbfa.firebaseio.com/users/chris/readings.json", firebase_ca);  //Specify destination for HTTP request
     Serial.println("http begun");
     http.addHeader("Content-Type", "application/json");             //Specify content-type header
@@ -84,18 +79,16 @@ void setup(){
     http.end();
   }
 
-  UBaseType_t uxHighWaterMark2 = uxTaskGetStackHighWaterMark( NULL );
-  Serial.print( "Memory: " );
-  Serial.print(uxHighWaterMark2 );
-  Serial.print( " ");
-  Serial.println( esp_get_free_heap_size() );
-
   // sleep
   digitalWrite(led_pin, LOW);
-  esp_deep_sleep_enable_timer_wakeup(10 * 1000000);
+  esp_deep_sleep_enable_timer_wakeup(sleep_time_seconds * 1000000);
   esp_deep_sleep_pd_config(ESP_PD_DOMAIN_RTC_PERIPH, ESP_PD_OPTION_OFF);
+  esp_deep_sleep_pd_config(ESP_PD_DOMAIN_RTC_SLOW_MEM, ESP_PD_OPTION_OFF);
+  esp_deep_sleep_pd_config(ESP_PD_DOMAIN_RTC_FAST_MEM, ESP_PD_OPTION_OFF);
+  esp_deep_sleep_pd_config(ESP_PD_DOMAIN_MAX, ESP_PD_OPTION_OFF);
   esp_deep_sleep_start();
 }
+
 
 void loop(){
   // int reading = analogRead(a_in_pin);
@@ -111,3 +104,12 @@ void loop(){
   // }
   // delay(100);
 }
+
+
+// void log_memory() {
+//   UBaseType_t uxHighWaterMark2 = uxTaskGetStackHighWaterMark( NULL );
+//   Serial.print( "Memory: " );
+//   Serial.print(uxHighWaterMark2 );
+//   Serial.print( " ");
+//   Serial.println( esp_get_free_heap_size() );
+// }
