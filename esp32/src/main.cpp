@@ -2,6 +2,7 @@
 #include <WiFi.h>
 #include <esp_log.h>
 #include <PubSubClient.h>
+#include <ArduinoJson.h>
 
 const char* ssid = "FASTWEB-1-D2700B";
 const char* password = "978C3B413C";
@@ -11,7 +12,12 @@ RTC_DATA_ATTR int last_reading = 0;
 const int a_in_pin = 34;
 const int led_pin = 5;
 int sleep_time_seconds = 1 * 60;
+const size_t bufferSize = JSON_OBJECT_SIZE(1) + JSON_OBJECT_SIZE(2) + JSON_OBJECT_SIZE(5) + 180;
+DynamicJsonBuffer jsonBuffer(bufferSize);
+const char* request_template = "{\"uri\":\"https://water-9dbfa.firebaseio.com/users/chris/readings.json\",\"method\":\"POST\",\"json\":true,\"body\":{\"level\":123456,\"timestamp\":{\".sv\":\"timestamp\"}},\"reply_id\":\"/request/reply/123456\"}";
 String reply_id;
+WiFiClient wiFiClient;
+PubSubClient pubSubClient(wiFiClient);
 
 void mqtt_callback(char* topic, byte* payload, unsigned int length) {
   Serial.print("Message arrived [");
@@ -34,7 +40,7 @@ void mqtt_callback(char* topic, byte* payload, unsigned int length) {
 }
 
 void setup(){
-  esp_log_level_set("*", ESP_LOG_VERBOSE);
+  //esp_log_level_set("*", ESP_LOG_VERBOSE);
   Serial.begin(115200);
   delay(5000);
   randomSeed(micros());
@@ -58,8 +64,6 @@ void setup(){
     Serial.println("Connected to the WiFi network");
 
     // MQTT
-    WiFiClient wiFiClient;
-    PubSubClient pubSubClient(wiFiClient);
     pubSubClient.setServer(mqtt_server, 1883);
     pubSubClient.setCallback(mqtt_callback);
 
@@ -69,9 +73,16 @@ void setup(){
       // if (client.connect(clientId.c_str(), mqtt_user.c_str(), mqtt_password.c_str())) {
       if (pubSubClient.connect(clientId.c_str())) {
         Serial.println("mqtt connected");
+        JsonObject& root = jsonBuffer.parseObject(request_template);
+        root["reply_id"] = reply_id;
         pubSubClient.subscribe(reply_id.c_str());
-        pubSubClient.publish("/request", "{\"uri\":\"https://water-9dbfa.firebaseio.com/users/chris/readings.json\",\"method\":\"POST\",\"json\":true,\"body\":{\"level\":123456,\"timestamp\":{\".sv\":\"timestamp\"}},\"reply_id\":\"/request/reply/xoxo\"}");
+        root["body"]["level"] = reading;
+        String request;
+        root.printTo(request);
+        Serial.println(request.c_str());
+        pubSubClient.publish("/request", request.c_str());
         last_reading = reading;
+        delay(5000);
       } else {
         Serial.print("mqtt failed, rc=");
         Serial.print(pubSubClient.state());
@@ -82,7 +93,9 @@ void setup(){
   }
 }
 
-void loop(){ }
+void loop() {
+  pubSubClient.loop();
+}
 
 
 // void log_memory() {
