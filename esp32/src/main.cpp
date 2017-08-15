@@ -1,51 +1,46 @@
 #include <Arduino.h>
 #include <WiFi.h>
-#include <WiFiClientSecure.h>
-#include <HTTPClient.h>
 #include <esp_log.h>
-
-const char* firebase_ca =     "-----BEGIN CERTIFICATE-----\n" \
-    "MIIEKDCCAxCgAwIBAgIQAQAhJYiw+lmnd+8Fe2Yn3zANBgkqhkiG9w0BAQsFADBC\n" \
-    "MQswCQYDVQQGEwJVUzEWMBQGA1UEChMNR2VvVHJ1c3QgSW5jLjEbMBkGA1UEAxMS\n" \
-    "R2VvVHJ1c3QgR2xvYmFsIENBMB4XDTE3MDUyMjExMzIzN1oXDTE4MTIzMTIzNTk1\n" \
-    "OVowSTELMAkGA1UEBhMCVVMxEzARBgNVBAoTCkdvb2dsZSBJbmMxJTAjBgNVBAMT\n" \
-    "HEdvb2dsZSBJbnRlcm5ldCBBdXRob3JpdHkgRzIwggEiMA0GCSqGSIb3DQEBAQUA\n" \
-    "A4IBDwAwggEKAoIBAQCcKgR3XNhQkToGo4Lg2FBIvIk/8RlwGohGfuCPxfGJziHu\n" \
-    "Wv5hDbcyRImgdAtTT1WkzoJile7rWV/G4QWAEsRelD+8W0g49FP3JOb7kekVxM/0\n" \
-    "Uw30SvyfVN59vqBrb4fA0FAfKDADQNoIc1Fsf/86PKc3Bo69SxEE630k3ub5/DFx\n" \
-    "+5TVYPMuSq9C0svqxGoassxT3RVLix/IGWEfzZ2oPmMrhDVpZYTIGcVGIvhTlb7j\n" \
-    "gEoQxirsupcgEcc5mRAEoPBhepUljE5SdeK27QjKFPzOImqzTs9GA5eXA37Asd57\n" \
-    "r0Uzz7o+cbfe9CUlwg01iZ2d+w4ReYkeN8WvjnJpAgMBAAGjggERMIIBDTAfBgNV\n" \
-    "HSMEGDAWgBTAephojYn7qwVkDBF9qn1luMrMTjAdBgNVHQ4EFgQUSt0GFhu89mi1\n" \
-    "dvWBtrtiGrpagS8wDgYDVR0PAQH/BAQDAgEGMC4GCCsGAQUFBwEBBCIwIDAeBggr\n" \
-    "BgEFBQcwAYYSaHR0cDovL2cuc3ltY2QuY29tMBIGA1UdEwEB/wQIMAYBAf8CAQAw\n" \
-    "NQYDVR0fBC4wLDAqoCigJoYkaHR0cDovL2cuc3ltY2IuY29tL2NybHMvZ3RnbG9i\n" \
-    "YWwuY3JsMCEGA1UdIAQaMBgwDAYKKwYBBAHWeQIFATAIBgZngQwBAgIwHQYDVR0l\n" \
-    "BBYwFAYIKwYBBQUHAwEGCCsGAQUFBwMCMA0GCSqGSIb3DQEBCwUAA4IBAQDKSeWs\n" \
-    "12Rkd1u+cfrP9B4jx5ppY1Rf60zWGSgjZGaOHMeHgGRfBIsmr5jfCnC8vBk97nsz\n" \
-    "qX+99AXUcLsFJnnqmseYuQcZZTTMPOk/xQH6bwx+23pwXEz+LQDwyr4tjrSogPsB\n" \
-    "E4jLnD/lu3fKOmc2887VJwJyQ6C9bgLxRwVxPgFZ6RGeGvOED4Cmong1L7bHon8X\n" \
-    "fOGLVq7uZ4hRJzBgpWJSwzfVO+qFKgE4h6LPcK2kesnE58rF2rwjMvL+GMJ74N87\n" \
-    "L9TQEOaWTPtEtyFkDbkAlDASJodYmDkFOA/MgkgMCkdm7r+0X8T/cKjhf4t5K7hl\n" \
-    "MqO5tzHpCvX2HzLc\n" \
-    "-----END CERTIFICATE-----\n";;
-
+#include <PubSubClient.h>
 
 const char* ssid = "FASTWEB-1-D2700B";
 const char* password = "978C3B413C";
+const char* mqtt_server = "192.168.1.199";
 RTC_DATA_ATTR int bootCount = 1;
 RTC_DATA_ATTR int last_reading = 0;
 const int a_in_pin = 34;
 const int led_pin = 5;
 int sleep_time_seconds = 1 * 60;
+String reply_id;
+
+void mqtt_callback(char* topic, byte* payload, unsigned int length) {
+  Serial.print("Message arrived [");
+  Serial.print(topic);
+  Serial.print("] ");
+  for (int i = 0; i < length; i++) {
+    Serial.print((char)payload[i]);
+  }
+  Serial.println();
+
+  if (strcmp(topic, reply_id.c_str()) == 0) {
+    digitalWrite(led_pin, LOW);
+    esp_deep_sleep_enable_timer_wakeup(sleep_time_seconds * 1000000);
+    esp_deep_sleep_pd_config(ESP_PD_DOMAIN_RTC_PERIPH, ESP_PD_OPTION_OFF);
+    esp_deep_sleep_pd_config(ESP_PD_DOMAIN_RTC_SLOW_MEM, ESP_PD_OPTION_OFF);
+    esp_deep_sleep_pd_config(ESP_PD_DOMAIN_RTC_FAST_MEM, ESP_PD_OPTION_OFF);
+    esp_deep_sleep_pd_config(ESP_PD_DOMAIN_MAX, ESP_PD_OPTION_OFF);
+    esp_deep_sleep_start();  
+  }
+}
 
 void setup(){
-  //esp_log_level_set("*", ESP_LOG_VERBOSE);
-
+  esp_log_level_set("*", ESP_LOG_VERBOSE);
   Serial.begin(115200);
+  delay(5000);
+  randomSeed(micros());
+
   pinMode(led_pin, OUTPUT);
   digitalWrite(led_pin, HIGH);
-  delay(5000);
 
   Serial.println("Boot number: " + String(bootCount++));
 
@@ -62,48 +57,32 @@ void setup(){
     }
     Serial.println("Connected to the WiFi network");
 
-    // POST  
-    HTTPClient http;
-    http.setReuse(true);
-    // ESP.getEfuseMac()
-    http.begin("https://water-9dbfa.firebaseio.com/users/chris/readings.json", firebase_ca);  //Specify destination for HTTP request
-    Serial.println("http begun");
-    http.addHeader("Content-Type", "application/json");             //Specify content-type header
-    int httpResponseCode = http.POST("{ \"level\": " + String(reading) + ", \"timestamp\": {\".sv\": \"timestamp\"} }");   
-    if(httpResponseCode > 0) {
-      last_reading = reading;
-      Serial.println(http.getString());
-    } else {
-      Serial.println("httpResponseCode: " + http.errorToString(httpResponseCode));
+    // MQTT
+    WiFiClient wiFiClient;
+    PubSubClient pubSubClient(wiFiClient);
+    pubSubClient.setServer(mqtt_server, 1883);
+    pubSubClient.setCallback(mqtt_callback);
+
+    while (!pubSubClient.connected()) {
+      String clientId = "esp32client" + String(random(0xffff), HEX);
+      reply_id = "/request/reply/" + clientId;
+      // if (client.connect(clientId.c_str(), mqtt_user.c_str(), mqtt_password.c_str())) {
+      if (pubSubClient.connect(clientId.c_str())) {
+        Serial.println("mqtt connected");
+        pubSubClient.subscribe(reply_id.c_str());
+        pubSubClient.publish("/request", "{\"uri\":\"https://water-9dbfa.firebaseio.com/users/chris/readings.json\",\"method\":\"POST\",\"json\":true,\"body\":{\"level\":123456,\"timestamp\":{\".sv\":\"timestamp\"}},\"reply_id\":\"/request/reply/xoxo\"}");
+        last_reading = reading;
+      } else {
+        Serial.print("mqtt failed, rc=");
+        Serial.print(pubSubClient.state());
+        Serial.println("mqtt try again in 5 seconds");
+        delay(5000);
+      }
     }
-    http.end();
   }
-
-  // sleep
-  digitalWrite(led_pin, LOW);
-  esp_deep_sleep_enable_timer_wakeup(sleep_time_seconds * 1000000);
-  esp_deep_sleep_pd_config(ESP_PD_DOMAIN_RTC_PERIPH, ESP_PD_OPTION_OFF);
-  esp_deep_sleep_pd_config(ESP_PD_DOMAIN_RTC_SLOW_MEM, ESP_PD_OPTION_OFF);
-  esp_deep_sleep_pd_config(ESP_PD_DOMAIN_RTC_FAST_MEM, ESP_PD_OPTION_OFF);
-  esp_deep_sleep_pd_config(ESP_PD_DOMAIN_MAX, ESP_PD_OPTION_OFF);
-  esp_deep_sleep_start();
 }
 
-
-void loop(){
-  // int reading = analogRead(a_in_pin);
-  // Serial.println("Reading: " + String(reading));
-
-  // if (reading != last_reading && reading != 0) {
-  //   last_reading = reading;
-
-  //   http.begin("https://water-9dbfa.firebaseio.com/users/chris/settings.json", firebase_ca);
-  //   http.addHeader("Content-Type", "application/json");
-  //   int httpResponseCode = http.PUT("{ \"reading\": " + String(reading) + ", \"timestamp\": {\".sv\": \"timestamp\"} }");   
-  //   Serial.println("httpResponseCode: " + http.errorToString(httpResponseCode));
-  // }
-  // delay(100);
-}
+void loop(){ }
 
 
 // void log_memory() {
