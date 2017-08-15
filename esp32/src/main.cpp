@@ -12,17 +12,26 @@ RTC_DATA_ATTR int last_reading = 0;
 const int a_in_pin = 34;
 const int led_pin = 5;
 int sleep_time_seconds = 1 * 60;
+const long mqtt_timeout_ms = 5 * 1000;
 const size_t bufferSize = JSON_OBJECT_SIZE(1) + JSON_OBJECT_SIZE(2) + JSON_OBJECT_SIZE(5) + 180;
 DynamicJsonBuffer jsonBuffer(bufferSize);
 const char* request_template = "{\"uri\":\"https://water-9dbfa.firebaseio.com/users/chris/readings.json\",\"method\":\"POST\",\"json\":true,\"body\":{\"level\":123456,\"timestamp\":{\".sv\":\"timestamp\"}},\"reply_id\":\"/request/reply/123456\"}";
 String reply_id;
 WiFiClient wiFiClient;
 PubSubClient pubSubClient(wiFiClient);
+unsigned long request_start_time;
+
+void sleep() {
+  esp_deep_sleep_enable_timer_wakeup(sleep_time_seconds * 1000000);
+  esp_deep_sleep_pd_config(ESP_PD_DOMAIN_RTC_PERIPH, ESP_PD_OPTION_OFF);
+  esp_deep_sleep_pd_config(ESP_PD_DOMAIN_RTC_SLOW_MEM, ESP_PD_OPTION_OFF);
+  esp_deep_sleep_pd_config(ESP_PD_DOMAIN_RTC_FAST_MEM, ESP_PD_OPTION_OFF);
+  esp_deep_sleep_pd_config(ESP_PD_DOMAIN_MAX, ESP_PD_OPTION_OFF);
+  esp_deep_sleep_start();  
+}
 
 void mqtt_callback(char* topic, byte* payload, unsigned int length) {
-  Serial.print("Message arrived [");
-  Serial.print(topic);
-  Serial.print("] ");
+  Serial.println(topic);
   for (int i = 0; i < length; i++) {
     Serial.print((char)payload[i]);
   }
@@ -30,12 +39,7 @@ void mqtt_callback(char* topic, byte* payload, unsigned int length) {
 
   if (strcmp(topic, reply_id.c_str()) == 0) {
     digitalWrite(led_pin, LOW);
-    esp_deep_sleep_enable_timer_wakeup(sleep_time_seconds * 1000000);
-    esp_deep_sleep_pd_config(ESP_PD_DOMAIN_RTC_PERIPH, ESP_PD_OPTION_OFF);
-    esp_deep_sleep_pd_config(ESP_PD_DOMAIN_RTC_SLOW_MEM, ESP_PD_OPTION_OFF);
-    esp_deep_sleep_pd_config(ESP_PD_DOMAIN_RTC_FAST_MEM, ESP_PD_OPTION_OFF);
-    esp_deep_sleep_pd_config(ESP_PD_DOMAIN_MAX, ESP_PD_OPTION_OFF);
-    esp_deep_sleep_start();  
+    sleep();
   }
 }
 
@@ -47,8 +51,6 @@ void setup(){
 
   pinMode(led_pin, OUTPUT);
   digitalWrite(led_pin, HIGH);
-
-  Serial.println("Boot number: " + String(bootCount++));
 
   // measure 
   int reading = analogRead(a_in_pin);
@@ -81,8 +83,8 @@ void setup(){
         root.printTo(request);
         Serial.println(request.c_str());
         pubSubClient.publish("/request", request.c_str());
+        request_start_time = millis();
         last_reading = reading;
-        delay(5000);
       } else {
         Serial.print("mqtt failed, rc=");
         Serial.print(pubSubClient.state());
@@ -95,6 +97,9 @@ void setup(){
 
 void loop() {
   pubSubClient.loop();
+  if ((millis() - request_start_time) > mqtt_timeout_ms) {
+    sleep();
+  }
 }
 
 
