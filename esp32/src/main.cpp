@@ -6,7 +6,7 @@
 
 const char* ssid = "FASTWEB-1-D2700B";
 const char* password = "978C3B413C";
-const char* mqtt_server = "192.168.1.199";
+const char* mqtt_server = "mqtt.chris.gunawardena.id.au";
 RTC_DATA_ATTR int bootCount = 1;
 RTC_DATA_ATTR int last_reading = 0;
 const int a_in_pin = 34;
