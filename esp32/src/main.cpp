@@ -10,16 +10,13 @@ int sleep_time_seconds = 1 * 60;
 void sleep();
 Network network(sleep);
 String reply_id;
-
+int reading;
 
 void mqtt_callback(char* topic, byte* payload, unsigned int length) {
-  Serial.println(topic);
-  for (int i = 0; i < length; i++) {
-    Serial.print((char)payload[i]);
-  }
-  Serial.println();
-
+  Serial.println("got mqtt reply");
+  // got a reply
   if (strcmp(topic, network.get_reply_id().c_str()) == 0) {
+    last_reading = reading;
     sleep();
   }
 }
@@ -35,13 +32,13 @@ void setup(){
 
   // measure 
   Messurement messurement(a_in_pin);
-  int reading = messurement.get_level();
+  reading = messurement.get_level();
   Serial.println("Reading: " + String(reading));
 
   if (reading == last_reading || reading == 0) {
     sleep();
   } else {
-    network.wifi_connect();
+    network.wifi_connect();  
     network.mqtt_connect();
     network.mqtt_send(reading, mqtt_callback);
   }
@@ -53,6 +50,9 @@ void loop() {
 }
 
 void sleep() {
+  Serial.println("sleep()");
+  network.mqtt_disconnect();
+  network.wifi_disconnect();
   digitalWrite(led_pin, LOW);
   esp_deep_sleep_enable_timer_wakeup(sleep_time_seconds * 1000000);
   esp_deep_sleep_pd_config(ESP_PD_DOMAIN_RTC_PERIPH, ESP_PD_OPTION_OFF);

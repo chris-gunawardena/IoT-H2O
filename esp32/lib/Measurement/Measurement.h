@@ -12,7 +12,7 @@ class Messurement
     static const int reading_timeout = 10 * 1000;
     int _pin;
     int readings[num_readings];      // the readings from the analog input
-    int read_index;              // the index of the current reading
+    int read_index = 0;              // the index of the current reading
     int total = 0;                  // the running total
     int average = 1;                // the average
     void (*_sleep)();
@@ -31,9 +31,13 @@ int Messurement::get_level() {
   do{
     total = total - readings[read_index];
     readings[read_index] = analogRead(_pin);
+    if (readings[read_index]==0)
+      return 0;
+
     total = total + readings[read_index];
-    variance = abs(100 - (readings[read_index] * 100 / average));
-    Serial.println("Reading " + String(readings[read_index] + " variance" + String(variance) + "/" + String(allowed_variance)));
+    Serial.println("avg: " + String(average));
+    variance = abs(100 - ((readings[read_index] * 100) / average));
+    Serial.println("Reading " + String(readings[read_index]) + " variance" + String(variance) + "/" + String(allowed_variance));
     read_index++;
     if (read_index >= num_readings) {
       read_index = 0;

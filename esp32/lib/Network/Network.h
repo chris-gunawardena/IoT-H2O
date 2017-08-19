@@ -9,10 +9,12 @@ class Network
     Network(void (*sleep)());
     void wifi_init();
     void wifi_connect();
+    void wifi_disconnect();
     void mqtt_init();
     void mqtt_connect();
     void mqtt_send(int reading, MQTT_CALLBACK_SIGNATURE);
     void mqtt_loop();
+    void mqtt_disconnect();
     String get_reply_id();
 
 private:
@@ -45,7 +47,7 @@ void Network::wifi_connect() {
     while (WiFi.status() != WL_CONNECTED) {
       Serial.println(".");
       if(--wifi_rety_count < 0) {
-        Serial.println("ERROR: No wifi connection in " + String(wifi_rety_count) + " tries, sleeping.");
+        Serial.println("ERROR: No wifi connection in " + String(wifi_rety_count) + " tries.");
         (*_sleep)();
       }
       delay(1000);
@@ -67,12 +69,11 @@ void Network::mqtt_connect() {
         if (pubSubClient.connect(clientId.c_str())) {
           Serial.println("MQTT connected");
         } else {
-          Serial.print("ERROR: mqtt failed: ");
-          Serial.print(pubSubClient.state());
-          Serial.println(" MQTT try again in 1 second");
+          Serial.print(".");
+          // Serial.print(pubSubClient.state());
           delay(1000);
-          if(--mqtt_rety_count < 0) {
-            Serial.println("ERROR: No MQTT connection in " + String(mqtt_rety_count) + " tries, sleeping.");
+          if(--mqtt_rety_count <= 0) {
+            Serial.println("ERROR: No MQTT connection in " + String(mqtt_rety_count) + " tries.");
             (*_sleep)();
           }  
         }
@@ -81,6 +82,17 @@ void Network::mqtt_connect() {
 void Network::mqtt_loop() {
     pubSubClient.loop();
 }
+
+void Network::mqtt_disconnect() {
+    if (pubSubClient.connected())
+        pubSubClient.disconnect();
+}
+
+void Network::wifi_disconnect() {
+    if (WiFi.status() == WL_CONNECTED) 
+        WiFi.disconnect();
+}
+
 
 void Network::mqtt_send(int reading, MQTT_CALLBACK_SIGNATURE) {
     pubSubClient.setCallback(callback);    
